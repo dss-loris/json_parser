@@ -18,7 +18,7 @@
 #include <stdio.h>
 
 #include "JTOK/inc/jtok.h"
-#include "jsons.h"
+#include "jsons_parser.h"
 
 #define BASE_10 10
 #define JSON_TKN_CNT 20
@@ -49,14 +49,14 @@ static char       value_holder[50];
 static const json_parse_table_item json_parse_table[] = {
 
   //  {.key = "fwVersion",  .handler = parse_firmware_json},
-  
+
   };
 /* clang-format on */
 
 
 int json_parse(uint8_t *json)
 {
-    CONFIG_ASSERT(json != NULL);
+    //CONFIG_ASSERT(json != NULL);
 
     int json_parse_status = 0;
 
@@ -115,3 +115,56 @@ int json_parse(uint8_t *json)
     }
     return json_parse_status;
 }
+
+//example
+
+
+static void *parse_pwm_rw_x(json_handler_args args)
+{
+    token_index_t *t = (token_index_t *)args;
+    CONFIG_ASSERT(*t < JSON_TKN_CNT);
+    *t += 1; // don't do ++ because * has higher precedence than ++
+    if (jtok_tokcmp("read", &tkns[*t]))
+    {
+        pwm_t current_x_pwm = reacwheel_get_wheel_pwm(REACTION_WHEEL_x);
+        OBC_IF_printf("{\"pwm_rw_x\" : %u}", current_x_pwm);
+    }
+    else if (jtok_tokcmp("write", &tkns[*t]))
+    {
+        *t += 1;
+        if (jtok_tokcmp("value", &tkns[*t]))
+        {
+             //getting values from JSON is a little unelegant in C ...
+            *t += 1;
+
+
+            memset(value_holder, 0, sizeof(value_holder));
+            jtok_tokcpy(value_holder, sizeof(value_holder), &tkns[*t]);
+            char *endptr    = value_holder;
+            pwm_t new_value = (pwm_t)strtoul(value_holder, &endptr, BASE_10);
+            if (*endptr != '\0')
+            {
+                //error parsing the value - couldn't reach end of token
+                return JSON_HANDLER_RETVAL_ERROR;
+            }
+            else
+            {
+                reacwheel_set_wheel_pwm(REACTION_WHEEL_x, new_value);
+                OBC_IF_printf("{\"pwm_rw_x\":\"written\"}");
+            }
+            memset(value_holder, 0, sizeof(value_holder));
+        }
+        else
+        {
+            return JSON_HANDLER_RETVAL_ERROR;
+        }
+    }
+    else
+    {
+
+        return JSON_HANDLER_RETVAL_ERROR;
+    }
+    return t;
+}
+
+*/
